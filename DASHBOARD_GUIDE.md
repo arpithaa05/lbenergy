@@ -173,18 +173,47 @@ Three metrics from the least-squares fit (`thermal_twin.RoomThermalTwin.fit`):
 - **Twin prediction** — `twin.predict_one_step(sub)`: each point predicted from the *previous actual* temperature plus one physics step. Tight tracking ⇒ good model; gaps ⇒ unmodelled events.
 - Caption shows the **one-step-ahead RMSE, Willmott's d, and n**.
 
-### 🔮 Predictive preheat planner
-Four inputs → one answer, via `twin.time_to_target(...)`:
-- Inputs: **current room °C**, **target °C**, **outside °C**, **heat input (kW)**.
+### 🗓️ Auto preheat schedule (from the lecture calendar)
+The headline Predict feature, via `twin.preheat_schedule(...)`. It reads the
+**lecture calendar** (`space_events`) and, for every lecture still ahead of the
+replay cursor, computes when the fleet should switch on.
+- Controls: **units to run**, **comfort setpoint °C**, **expected people**.
+- Inputs it pulls automatically: **current room temp** (from telemetry at the
+  cursor) and **outside temp** (latest measured value, used as a persistence
+  forecast — clearly labelled).
+- Output: a table of upcoming lectures with **recommended switch-on times** and a
+  headline for the next one ("Next lecture 09:00 → switch on at 07:35").
+- The *units* control also answers the challenge's **"would N units be enough?"**
+  question — drop units and watch lead times grow or flip to "need more units".
+
+### 📈 Proof chart — "reaches the setpoint exactly at lecture start"
+For the next reachable lecture, plots the predicted room-temp curve (via
+`twin.trajectory(...)`) from the switch-on moment, with the **setpoint line**, the
+**switch-on marker**, and the **lecture-start marker**. By construction the curve
+crosses the setpoint precisely when the lecture begins — the visible proof of
+"right temperature at the right time."
+
+### 🎛️ Thermal physics playground
+Interactive simulator, sliders seeded with the **fitted** values:
+- Sliders: **C, UA, Q_HVAC (± for cooling), outside temp, people, start temp, duration**.
+- Plots the live room-temp curve (`twin.trajectory(...)`, the exact analytic
+  solution of the same ODE) plus metrics: **settles at T_ss**, **τ**, **final temp**.
+- Drag outside temp down or power off to demo cold-morning / what-if scenarios live.
+
+### 🔮 What-if preheat calculator
+Manual sandbox version of the same maths, via `twin.time_to_target(...)`:
+- Inputs: **current room °C**, **target °C**, **outside °C**, **units running**, **people**.
 - Output: **"Start heating N minutes before occupancy"** to hit the target on arrival.
+- Available heat = `units × HEAT_PUMP_DELIVERED_KW_PER_UNIT` (delivered thermal),
+  plus occupant body heat.
 - Formula (closed-form RC solution):
   ```
-  T_ss = T_out + Q_heat/UA          (steady state this power holds)
+  T_ss = T_out + (Q_heat + Q_people)/UA   (steady state this power holds)
   τ    = C/UA
   t    = −τ · ln((T_target − T_ss)/(T_start − T_ss))
   ```
-- If the target exceeds `T_ss` (unreachable at that power), it shows an error
-  prompting more power instead of a time.
+- Reachability guard: if the target sits above `T_ss`, or the lead time would
+  exceed 8 h, it shows "run more units" instead of an absurd or impossible time.
 
 ---
 
@@ -200,7 +229,9 @@ Four inputs → one answer, via `twin.time_to_target(...)`:
 | Fleet cards (status/COP) | `device_table` | [kpis.py](kpis.py) |
 | Alert feed | `run_all` (6 detectors) | [monitors.py](monitors.py) |
 | Twin params / chart | `fit`, `predict_one_step`, `validate` | [thermal_twin.py](thermal_twin.py) |
-| Preheat planner | `time_to_target` | [thermal_twin.py](thermal_twin.py) |
+| Auto preheat schedule | `preheat_schedule` | [thermal_twin.py](thermal_twin.py) |
+| Proof chart / playground | `trajectory` | [thermal_twin.py](thermal_twin.py) |
+| What-if preheat calc | `time_to_target` | [thermal_twin.py](thermal_twin.py) |
 | Cursor-filtered data | `ReplaySource.snapshots/power/events(up_to=cursor)` | [data_loader.py](data_loader.py) |
 
 For the deeper physics and full function reference, see

@@ -206,6 +206,28 @@ class RoomThermalTwin:
             out[i] = T
         return pd.Series(out, index=idx, name="t_in_predicted")
 
+    # -- forward trajectory (closed form, for the live simulator) ----------
+    def trajectory(self, t_start, t_out, q_heat_w, q_people_w=0.0,
+                   minutes=240, step_min=2.0):
+        """
+        Room temperature over time under *constant* inputs, as the exact analytic
+        solution of the ODE (identical to a converged RK4 step-through, but instant
+        so it can recompute on every slider move):
+
+            T(t) = T_ss + (T_start - T_ss) * exp(-t / tau)
+            T_ss = T_out + (Q_heat + Q_people)/UA,   tau = C/UA
+
+        Returns (minutes_array, temperature_array).
+        """
+        if self.params is None:
+            raise RuntimeError("twin must be fit() before trajectory()")
+        C, UA = self.params.C_J_per_C, self.params.UA_W_per_C
+        t_ss = t_out + (q_heat_w + q_people_w) / UA
+        tau_s = C / UA
+        mins = np.arange(0.0, minutes + step_min, step_min)
+        temps = t_ss + (t_start - t_ss) * np.exp(-(mins * 60.0) / tau_s)
+        return mins, temps
+
     # -- time-to-target (closed form, for preheat scheduling) --------------
     # max preheat lead time we treat as practically useful (minutes)
     MAX_PREHEAT_MIN = 8 * 60
@@ -226,13 +248,25 @@ class RoomThermalTwin:
         if self.params is None:
             raise RuntimeError("twin must be fit() before time_to_target()")
         C, UA = self.params.C_J_per_C, self.params.UA_W_per_C
+        # already at/above the target -> no preheat needed
+        if t_start >= t_target:
+            return 0.0
         t_ss = t_out + (q_heat_w + q_people_w) / UA
-        # unreachable: steady state never crosses the target
-        if (t_target - t_ss) / (t_start - t_ss) <= 0:
+        # The room moves monotonically from T_start toward the steady state T_ss,
+        # so it only ever passes through T_target if T_target lies between T_start
+        # and T_ss. With ratio = (T_target - T_ss)/(T_start - T_ss):
+        #   ratio <= 0  -> target on the far side of T_ss  (unreachable)
+        #   ratio  > 1  -> target beyond T_start, away from T_ss (unreachable:
+        #                  e.g. asking for 21C when this power can only hold 16C)
+        #   0 < ratio <= 1 -> reachable; ratio == 1 means already at target (0 min)
+        denom = t_start - t_ss
+        if denom == 0:                       # already sitting at steady state
+            return 0.0 if t_target == t_start else None
+        ratio = (t_target - t_ss) / denom
+        if ratio <= 0 or ratio > 1:
             return None
         tau_s = C / UA
-        t_s = -tau_s * np.log((t_target - t_ss) / (t_start - t_ss))
-        minutes = max(0.0, t_s / 60.0)
+        minutes = max(0.0, -tau_s * np.log(ratio) / 60.0)
         # barely reachable (T_ss only just above target) -> impractical lead time
         if minutes > self.MAX_PREHEAT_MIN:
             return None
@@ -279,3 +313,50 @@ def build_twin_frame(source, freq: str = "15min") -> pd.DataFrame:
     grid["q_people_w"] = occupants * config.SENSIBLE_GAIN_PER_PERSON_W
 
     return grid.dropna(subset=["t_in", "t_out"])
+
+
+# ---------------------------------------------------------------------------
+# Schedule-driven preheat planning (the actual "when to switch on" answer)
+# ---------------------------------------------------------------------------
+def preheat_schedule(twin, frame, events, cursor, units, target_c,
+                     people=0, t_out_forecast=None):
+    """
+    For every lecture/event that has not yet started, work out when the fleet
+    should switch on so the room hits `target_c` exactly at the event start.
+
+    twin           a fitted RoomThermalTwin
+    frame          the twin-input frame (for current room/outside temp)
+    events         space_events DataFrame (columns starts_at, ends_at)
+    cursor         "now" -- only events with starts_at > cursor are scheduled
+    units          number of heat-pump units assumed running for the preheat
+    target_c       comfort setpoint to reach on arrival
+    people         expected occupants during preheat (their body heat helps)
+    t_out_forecast outside temp to assume; defaults to the latest measured value
+                   (a naive persistence forecast -- swap for a real forecast later)
+
+    Returns a list of dicts, one per upcoming event:
+        {starts_at, switch_on_at, lead_min, t_now, t_out, reachable}
+    """
+    # current room temperature = most recent value at/before the cursor
+    sub = frame[frame.index <= cursor]
+    t_now = float(sub["t_in"].iloc[-1]) if len(sub) else target_c
+    if t_out_forecast is None:
+        t_out_forecast = float(sub["t_out"].iloc[-1]) if len(sub) else 5.0
+
+    q_heat_w = units * config.HEAT_PUMP_DELIVERED_KW_PER_UNIT * 1000.0
+    q_people_w = people * config.SENSIBLE_GAIN_PER_PERSON_W
+
+    upcoming = events[events["starts_at"] > cursor].sort_values("starts_at")
+    rows = []
+    for _, ev in upcoming.iterrows():
+        lead = twin.time_to_target(t_now, target_c, t_out_forecast, q_heat_w, q_people_w)
+        rows.append({
+            "starts_at": ev["starts_at"],
+            "switch_on_at": (ev["starts_at"] - pd.Timedelta(minutes=lead)
+                             if lead is not None else None),
+            "lead_min": lead,
+            "t_now": t_now,
+            "t_out": t_out_forecast,
+            "reachable": lead is not None,
+        })
+    return rows

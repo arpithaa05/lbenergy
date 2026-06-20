@@ -53,6 +53,13 @@ RATED_AIRFLOW_M3_PER_H = 5000.0   # supply airflow per unit at 100% fan
 AIR_DENSITY_KG_PER_M3 = 1.2
 AIR_CP_KJ_PER_KG_K = 1.005
 
+# Typical *delivered thermal* output of one heat-pump unit at full output (kW).
+# Derived from the data: per-device delivered heat over active periods is
+# ~10-23 kW (see thermal_twin.device_cop); ~15 kW is a representative full-tilt
+# figure. The preheat planner uses (units x this) as the available heat input,
+# which also answers the "would N units be enough?" scenario question.
+HEAT_PUMP_DELIVERED_KW_PER_UNIT = 15.0
+
 # ---------------------------------------------------------------------------
 # Space control settings (from dataset README)
 # ---------------------------------------------------------------------------
