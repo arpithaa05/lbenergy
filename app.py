@@ -12,11 +12,11 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-import lbenergy.config as config
-import lbenergy.data_loader as dl
-import lbenergy.kpis as kpis
-import lbenergy.monitors as monitors
-import lbenergy.thermal_twin as tt
+import config as config
+import data_loader as dl
+import kpis as kpis
+import monitors as monitors
+import thermal_twin as tt
 
 st.set_page_config(page_title="IHL Monitor — LB Energy", page_icon="🔥", layout="wide")
 
@@ -292,7 +292,8 @@ with tab_twin:
     q_kw = cc[3].number_input("Heat input (kW)", 1.0, 60.0, 12.0, 1.0)
     mins = twin.time_to_target(t_start, t_target, t_out, q_kw * 1000)
     if mins is None:
-        st.error("Target unreachable at this heat input — increase power or it will never arrive.")
+        st.error("Target not practically reachable at this heat input — it would either "
+                 "never arrive or take impractically long (>8 h). Increase the power.")
     else:
         st.success(f"⏱️ Start heating **{mins:.0f} minutes** before occupancy to hit "
                    f"{t_target:.0f}°C on arrival — no more cold rooms, no panic electric heating.")

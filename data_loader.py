@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-import lbenergy.config as config
+import config as config
 
 # ---------------------------------------------------------------------------
 # Alarm-register decoding (Modbus registers 1901-1904, see dataset README)

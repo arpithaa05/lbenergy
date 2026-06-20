@@ -30,7 +30,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-import lbenergy.config as config
+import config as config
 
 
 # ---------------------------------------------------------------------------
@@ -207,12 +207,21 @@ class RoomThermalTwin:
         return pd.Series(out, index=idx, name="t_in_predicted")
 
     # -- time-to-target (closed form, for preheat scheduling) --------------
+    # max preheat lead time we treat as practically useful (minutes)
+    MAX_PREHEAT_MIN = 8 * 60
+
     def time_to_target(self, t_start, t_target, t_out, q_heat_w, q_people_w=0.0):
         """
         Closed-form minutes to go from t_start to t_target under constant inputs:
             T_ss = T_out + (Q_heat + Q_people)/UA,  tau = C/UA
             t = -tau * ln((T_target - T_ss)/(T_start - T_ss))
         Returns minutes, or None if the target is unreachable with this power.
+
+        Note: as T_target approaches the steady-state T_ss, the room only reaches
+        the target asymptotically and t -> infinity. A target that is technically
+        reachable but needs an impractical lead time (> MAX_PREHEAT_MIN) is treated
+        as "effectively unreachable" so the planner never returns absurd values
+        like 10000 minutes -- the caller should prompt for more power instead.
         """
         if self.params is None:
             raise RuntimeError("twin must be fit() before time_to_target()")
@@ -223,7 +232,11 @@ class RoomThermalTwin:
             return None
         tau_s = C / UA
         t_s = -tau_s * np.log((t_target - t_ss) / (t_start - t_ss))
-        return max(0.0, t_s / 60.0)
+        minutes = max(0.0, t_s / 60.0)
+        # barely reachable (T_ss only just above target) -> impractical lead time
+        if minutes > self.MAX_PREHEAT_MIN:
+            return None
+        return minutes
 
 
 # ---------------------------------------------------------------------------

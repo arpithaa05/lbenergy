@@ -1,0 +1,5 @@
+device_id,label,type,hardware_version
+bdaf0e14-2cd1-43c8-b9ea-b3c90309f773,"Device 1",DEVICE_HEAT_PUMP,0.2.0
+1c893f75-4599-4402-9d4c-1017aa858fa8,"Device 2",DEVICE_HEAT_PUMP,0.2.0
+e72fea56-abe7-4d3f-a0ed-1e6b6c462157,"Device 3",DEVICE_HEAT_PUMP,0.2.0
+930f3621-05df-4574-9270-9d994c5b716c,"Device 4",DEVICE_HEAT_PUMP,0.2.0
