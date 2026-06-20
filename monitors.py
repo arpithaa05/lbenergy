@@ -22,9 +22,9 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-import lbenergy.config as config
-import lbenergy.data_loader as dl
-import lbenergy.thermal_twin as tt
+import config as config
+import data_loader as dl
+import thermal_twin as tt
 
 
 # ---------------------------------------------------------------------------

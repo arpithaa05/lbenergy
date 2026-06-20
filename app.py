@@ -12,11 +12,11 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-import lbenergy.config as config
-import lbenergy.data_loader as dl
-import lbenergy.kpis as kpis
-import lbenergy.monitors as monitors
-import lbenergy.thermal_twin as tt
+import config as config
+import data_loader as dl
+import kpis as kpis
+import monitors as monitors
+import thermal_twin as tt
 
 st.set_page_config(page_title="IHL Monitor — LB Energy", page_icon="🔥", layout="wide")
 
@@ -40,7 +40,7 @@ def load(window: str):
 # ---------------------------------------------------------------------------
 # Sidebar — controls (the "live replay" cursor + economic assumptions)
 # ---------------------------------------------------------------------------
-st.sidebar.title("🔥 IHL Monitor")
+st.sidebar.title("IHL Monitor")
 st.sidebar.caption("Live monitoring for the Intelligent Heat Link")
 
 window = st.sidebar.radio("Season window", ["heating", "cooling"], format_func=str.capitalize)

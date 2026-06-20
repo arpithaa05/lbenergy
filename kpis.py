@@ -11,9 +11,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-import lbenergy.config as config
-import lbenergy.data_loader as dl
-import lbenergy.thermal_twin as tt
+import config as config
+import data_loader as dl
+import thermal_twin as tt
 
 
 def _energy_kwh(power: pd.DataFrame) -> float:
@@ -36,7 +36,7 @@ def energy_cost_co2(power: pd.DataFrame) -> dict:
 def waste_breakdown(snap: pd.DataFrame, power: pd.DataFrame, events: pd.DataFrame) -> dict:
     """Avoidable energy/€ from the two big causes: faulty electric backup and
     conditioning an empty room."""
-    import lbenergy.monitors as monitors  # local import to avoid a module cycle
+    import monitors as monitors  # local import to avoid a module cycle
     out = {"fault_kwh": 0.0, "unoccupied_kwh": 0.0, "avoidable_kwh": 0.0}
 
     # fault: excess energy of any backup/alarm device vs the healthy-fleet median

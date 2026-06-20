@@ -30,7 +30,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-import lbenergy.config as config
+import config 
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ class RoomThermalTwin:
         valid = dTdt.notna() & dt_s.notna() & (dt_s > 0)
         y = q_total[valid].values                            # W
         # model: y = C*dTdt + UA*delta  -> solve [dTdt, delta] @ [C, UA] = y
-        A = np.column_stack([dTdt[valid].values, delta[valid].values])
+        A = np.column_stack([dTdt[valid].values, delta[valid].values]) # type: ignore
         coef, *_ = np.linalg.lstsq(A, y, rcond=None)
         C, UA = float(coef[0]), float(coef[1])
 
