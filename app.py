@@ -14,6 +14,7 @@ import streamlit as st
 
 import config as config
 import data_loader as dl
+import detect as detect
 import kpis as kpis
 import monitors as monitors
 import thermal_twin as tt
@@ -106,8 +107,8 @@ if k:
                 help="Number of live alerts right now, and how many are critical")
 
 
-tab_fleet, tab_alerts, tab_impact, tab_twin = st.tabs(
-    ["🩺 Fleet", "🔔 Alerts", "💰 Impact & Savings", "🧠 Digital Twin"])
+tab_fleet, tab_alerts, tab_detect, tab_impact, tab_twin = st.tabs(
+    ["🩺 Fleet", "🔔 Alerts", "🔎 Detect", "💰 Impact & Savings", "🧠 Digital Twin"])
 
 
 # -----------------------------------------Why ----------------------------------
@@ -167,6 +168,104 @@ with tab_alerts:
                 st.markdown(f"➡️ _{a.action}_")
             if tags:
                 st.markdown(f"Compliance: {tags}")
+
+
+# ---------------------------------------------------------------------------
+# Tab: Detect — anomaly classification (normal vs abnormal)
+# ---------------------------------------------------------------------------
+ANOM_COLOR = {
+    "Door/window open": "#f39c12", "Heater defect": "#e74c3c",
+    "Tampering (sensor)": "#9b59b6", "Tampering (control)": "#8e44ad",
+    "Unexplained cooling": "#e67e22",
+}
+
+with tab_detect:
+    st.subheader("Anomaly detection — telling normal from abnormal")
+    st.caption("The digital twin predicts how the room *should* behave. The "
+               "**residual** (measured − predicted) stays small for normal, gradual "
+               "changes — and spikes when something the physics can't explain happens. "
+               "The *shape* of the spike (+ CO₂, duration) classifies it.")
+
+    sub = frame[frame.index <= cursor]
+
+    # demo injector: overlay a synthetic event so the classifier can be shown live
+    st.markdown("**🧪 Demo:** inject a scenario and watch the system classify it")
+    inj = st.radio("Scenario", ["None (real data)", "Door / window opened",
+                                "Heater defect", "Tampering — sensor spoof",
+                                "Tampering — rogue heating"],
+                   horizontal=True)
+    kind_map = {"Door / window opened": "door", "Heater defect": "defect",
+                "Tampering — sensor spoof": "tamper_sensor",
+                "Tampering — rogue heating": "tamper_control"}
+    view = sub if inj == "None (real data)" else detect.inject_scenario(twin, sub, kind_map[inj], 0.6)
+
+    res = twin.residuals(view)
+    anomalies = detect.classify_anomalies(twin, view)
+
+    # --- residual timeline with the normal band + classified markers ---
+    band = detect.anomaly_band(twin, sub)
+    fig = go.Figure()
+    fig.add_hrect(y0=-band, y1=band, fillcolor="#2ecc71", opacity=0.12, line_width=0)
+    fig.add_trace(go.Scatter(x=view.index, y=res, name="Residual °C",
+                             line=dict(color="#34495e", width=1.5)))
+    for a in anomalies:
+        fig.add_trace(go.Scatter(
+            x=[a.timestamp], y=[a.residual], mode="markers",
+            marker=dict(size=13, color=ANOM_COLOR.get(a.kind, "#c0392b"),
+                        line=dict(width=1, color="white")),
+            name=a.kind, showlegend=False,
+            hovertext=a.explanation, hoverinfo="text"))
+    fig.update_layout(height=320, margin=dict(t=10, b=10),
+                      yaxis_title="Residual °C (measured − predicted)", showlegend=False)
+    fig.add_annotation(x=view.index[len(view)//2], y=band, yshift=10,
+                       text="green band = normal (physics explains it)",
+                       showarrow=False, font=dict(color="#27ae60", size=11))
+    st.plotly_chart(fig, use_container_width=True)
+
+    # --- what the system concluded ---
+    if not anomalies:
+        st.success("✅ No anomalies — the room is behaving exactly as the physics "
+                   "predicts. Gradual daily changes are explained by the model, so "
+                   "they don't raise false alarms.")
+    else:
+        st.markdown("**🔍 Classified events**")
+        for a in anomalies:
+            col = ANOM_COLOR.get(a.kind, "#c0392b")
+            with st.container(border=True):
+                st.markdown(
+                    f"<span style='color:{col};font-weight:700'>{a.kind}</span> · "
+                    f"<span style='color:{SEV_COLOR.get(a.severity)};'>"
+                    f"{a.severity.upper()}</span> · {a.timestamp:%a %d %b %H:%M}",
+                    unsafe_allow_html=True)
+                st.caption(a.explanation)
+                st.markdown(f"➡️ _{a.action}_  ·  alerts **{a.recipient}**")
+
+    # --- early warning (predictive) ---
+    st.markdown("#### ⏰ Early warning (predictive)")
+    ew = detect.early_warning(twin, sub, float(config.EVENT_TEMP_C))
+    if ew is None:
+        st.info("On track — the room is projected to stay at/above the setpoint at "
+                "the current heat output.")
+    else:
+        st.warning(f"⚠️ {ew['message']} (now {ew['t_now']:.1f}°C → "
+                   f"{ew['projected']:.1f}°C). Act before anyone feels it.")
+
+    # --- auto-alert routing ---
+    st.markdown("#### 🔔 Auto-dispatched notifications")
+    st.caption("Detected issues are routed automatically — critical to the "
+               "technician (SMS), warnings to the superintendent (email).")
+    notes = detect.route_notifications(anomalies, alerts)
+    if not notes:
+        st.write("No notifications to send.")
+    for nt in notes[:8]:
+        col = SEV_COLOR.get(nt["severity"], "#999")
+        with st.container(border=True):
+            st.markdown(
+                f"{nt['channel']} → **{nt['recipient']}**  ·  "
+                f"<span style='color:{col};font-weight:700'>{nt['severity'].upper()}</span>",
+                unsafe_allow_html=True)
+            st.markdown(f"**{nt['subject']}**")
+            st.caption(nt["body"])
 
 
 # ---------------------------------------------------------------------------

@@ -20,7 +20,7 @@ and where the number comes from in the code.
 │  • Season    │  HERO KPI STRIP (6 metrics)                            │
 │  • Cursor    │  💶 Avoidable │ ⚡ Energy │ 🌍 CO₂ │ 🩺 Fleet │ 🌡️ … │ 🔔 │
 │  • Economics │                                                        │
-│  • Twin fit  │  TABS:  🩺 Fleet │ 🔔 Alerts │ 🔍 Device │ 💰 Impact │ 🧠 Twin │
+│  • Twin fit  │  TABS:  🩺 Fleet │ 🔔 Alerts │ 🔎 Detect │ 💰 Impact │ 🧠 Twin │
 │              │  ──────────────────────────────────────────────────── │
 │              │  (selected tab content)                                │
 └──────────────┴──────────────────────────────────────────────────────┘
@@ -122,17 +122,41 @@ If there are no alerts, a green "No active alerts" message shows instead.
 
 ---
 
-## 5. Tab: 🔍 Device detail
+## 5. Tab: 🔎 Detect — telling normal from abnormal
 
-A drop-down selects one device; four charts plot its raw telemetry up to the
-cursor (sorted by time):
+The Detect pillar. It uses the digital twin's **residual** (measured − predicted
+room temp) to separate normal behaviour from anomalies, and classifies each
+anomaly by its signature. Powered by [detect.py](detect.py).
 
-1. **Supply vs Return temperature (°C)** — `status_temperature_supply/return_in_celsius`. The gap (ΔT) is the heating/cooling the unit is delivering; a large ΔT with the compressor off is the electric-backup red flag.
-2. **Refrigerant pressures (bar)** — `status_low_pressure` / `status_high_pressure`. Used for leak/charge diagnostics (compared fleet-relative, since they drift with outside temp).
-3. **Power draw (kW)** — `power_draw_kw` over time for this unit.
-4. **Air quality** — CO₂ (ppm) and humidity (%) on a dual axis. CO₂ also drives occupancy inference.
+### Residual timeline + normal band
+A chart of the residual over time with a green **"normal" band** (`±` a robust
+multiple of the clean-fit noise). Inside the band = the room behaves as physics
+predicts, including *gradual daily changes* → **no false alarms**. Spikes outside
+the band are anomalies, marked and colour-coded by class.
 
-These are raw measured series (no modelling) — the "look under the hood" view.
+### 🧪 Demo injector
+A radio control overlays a synthetic event so the classifier can be shown live
+(`detect.inject_scenario`): **door opened**, **heater defect**, **sensor spoof**,
+**rogue heating**. "None (real data)" shows the real week (which is clean).
+
+### How each class is told apart (`detect.classify_anomalies`)
+| Class | Signature |
+|---|---|
+| **Door/window open** | residual ≪ 0 (cools faster than predicted) **+ a CO₂ drop** (fresh air in) |
+| **Heater defect** | residual ≪ 0 **and sustained** over several steps, no CO₂ drop |
+| **Tampering (sensor)** | room temp jumps faster than physically possible (> 6 °C/step) |
+| **Tampering (control)** | residual ≫ 0 (room *warms*) with little/no commanded heat |
+| **Normal / gradual** | within the band → not flagged |
+
+### ⏰ Early warning (predictive)
+`detect.early_warning` free-runs the twin from the latest state at the current
+heat output; if the room is projected to fall below the setpoint and not recover,
+it warns **before** anyone feels it ("know before freezing students").
+
+### 🔔 Auto-dispatched notifications
+`detect.route_notifications` routes detected issues automatically — **critical →
+Technician (SMS)**, **warning → Superintendent (email)** — shown as mock messages.
+This is the challenge's "automatically alerts the superintendent/technician".
 
 ---
 
@@ -228,6 +252,8 @@ Manual sandbox version of the same maths, via `twin.time_to_target(...)`:
 | Fleet health | `fleet_health` | [kpis.py](kpis.py) |
 | Fleet cards (status/COP) | `device_table` | [kpis.py](kpis.py) |
 | Alert feed | `run_all` (6 detectors) | [monitors.py](monitors.py) |
+| Anomaly classify / inject | `classify_anomalies`, `inject_scenario` | [detect.py](detect.py) |
+| Early warning / routing | `early_warning`, `route_notifications` | [detect.py](detect.py) |
 | Twin params / chart | `fit`, `predict_one_step`, `validate` | [thermal_twin.py](thermal_twin.py) |
 | Auto preheat schedule | `preheat_schedule` | [thermal_twin.py](thermal_twin.py) |
 | Proof chart / playground | `trajectory` | [thermal_twin.py](thermal_twin.py) |

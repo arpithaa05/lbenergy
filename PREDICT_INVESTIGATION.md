@@ -28,7 +28,7 @@ This record is about **Predict**.
 | Pillar | State | ~% |
 |---|---|---|
 | Predict | Physics twin + validated one-step + **auto schedule-driven preheat planner** + **proof chart** + **interactive simulator** + what-if calculator. | ~90% |
-| Detect | 6 detectors (door/envelope, refrigerant/electric-backup defect, comfort, energy waste, connectivity). | ~60% |
+| Detect | 6 monitor detectors + **residual-based anomaly classifier** (door/defect/tamper-sensor/tamper-control), **early warning**, **auto-alert routing**. See `DETECT_NOTES.md`. | ~85% |
 | Visualize | Impact tab (€/kWh/CO₂, avoidable waste), Fleet, Alerts, twin charts. | ~55% |
 
 > **Update:** steps 1 and 3 of §7 are done — auto-planner (§9) and proof chart +
