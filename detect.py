@@ -256,7 +256,7 @@ def route_notifications(anomalies: list[Anomaly], alerts=None) -> list[dict]:
     for a in anomalies:
         notes.append({
             "severity": a.severity,
-            "channel": "📱 SMS" if a.severity == "critical" else "✉️ Email",
+            "channel": "SMS" if a.severity == "critical" else "Email",
             "recipient": a.recipient,
             "subject": a.kind,
             "body": f"{a.timestamp:%Y-%m-%d %H:%M} — {a.explanation} → {a.action}",

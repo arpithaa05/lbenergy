@@ -160,22 +160,30 @@ This is the challenge's "automatically alerts the superintendent/technician".
 
 ---
 
-## 6. Tab: 💰 Impact & Savings
+## 6. Tab: Impact & Savings
+
+### Baseline vs intelligent control (the headline before/after)
+Two bars: **Without IHL action** (current annual cost) vs **With IHL control**
+(current − avoidable). The gap is what IHL unlocks, with a "Saved / year" €
+metric and a CO₂-cut metric. Honest framing: on this week the % is high because it
+includes fixing the faulty unit; LB Energy's *steady-state* efficiency promise is
+20–30%.
 
 ### "Where the money goes" bar chart
 From `kpis.waste_breakdown(...)`, annualised. Two bars:
 - **Faulty unit (electric backup)** = `fault_kwh × tariff`, annualised.
 - **Empty-room conditioning** = `unoccupied_kwh × 0.5 × tariff`, annualised.
 
-### Savings metrics (right column)
-- **Total avoidable / year** — `avoidable_eur_annual` (same as the hero KPI).
-- **Avoidable energy / year** — `avoidable_kwh` annualised.
-- **Avoidable CO₂ / year** — `avoidable_co2_kg` annualised.
-- **% of running cost** — `avoidable_annual / total_annual_cost × 100`, framed against LB Energy's 20–30% efficiency promise.
+### What if we lower the setpoint? (interactive)
+Answers the challenge's *"what happens if I lower the temperature by 2 °C?"* A
+slider drops the occupied target; saving ≈ `current_annual × (ΔT / gap)` where
+`gap = mean(T_in − T_out)` (≈ a few % per °C). Shows €/yr and CO₂/yr saved, the new
+target, and a bar of saving across −0.5 … −3 °C.
 
-> **Assumptions surfaced in the caption:** faulty-unit excess is measured vs the
-> healthy-fleet median; half of unoccupied-room energy is treated as avoidable via
-> occupancy-aware setback.
+> **Assumptions surfaced in captions:** faulty-unit excess vs the healthy-fleet
+> median; half of unoccupied-room energy avoidable via occupancy-aware setback;
+> setpoint saving is a heating-season heat-loss proportionality with a comfort
+> trade-off.
 
 ### 🇪🇺 Compliance posture (3 info cards)
 - **F-Gas Reg. (EU 2024/573)** — refrigerant low-pressure events auto-detected & logged for leak-check compliance.
